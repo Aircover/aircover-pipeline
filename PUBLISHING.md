@@ -15,7 +15,7 @@ Releases are automated via GitHub Actions Trusted Publishing — no PyPI API tok
 ### 1. Create a PyPI account
 
 1. Go to <https://pypi.org/account/register/>.
-2. Use an email that's actively monitored — PyPI sends publish failures and security alerts here. A shared `pypi@aircover.ai` mailbox is ideal so it doesn't depend on one person.
+2. Use an email that's actively monitored — PyPI sends publish failures and security alerts here. A shared `support@aircover.ai` mailbox is ideal so it doesn't depend on one person.
 3. Verify the email.
 4. **Enable 2FA** (PyPI requires it for publishing). Use a TOTP app (1Password, Authy, etc.) or a hardware key.
 
