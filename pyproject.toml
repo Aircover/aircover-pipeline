@@ -29,7 +29,10 @@ test = ["pytest>=7.4"]
 # Note: PEP 621 / setuptools >=79 requires URL values here. The support
 # email is in [project.authors] and in the README; don't add it here.
 Homepage = "https://aircover.ai"
-Documentation = "https://app.aircover.ai"
+Documentation = "https://github.com/Aircover/aircover-pipeline#readme"
+Source = "https://github.com/Aircover/aircover-pipeline"
+Issues = "https://github.com/Aircover/aircover-pipeline/issues"
+Changelog = "https://github.com/Aircover/aircover-pipeline/blob/main/CHANGELOG.md"
 
 [project.scripts]
 aircover-pipeline = "aircover_pipeline:main"
