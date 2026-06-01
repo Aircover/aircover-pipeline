@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aircover.ai/schemas/aircover-pipeline/agent-output-1.0.json",
+  "title": "Aircover Pipeline — agent-outputs/agent_<meeting_id>.json (v1.0)",
+  "description": "Coaching agent output for a single meeting, written one file per meeting under <output-dir>/agent-outputs/.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["meeting_id", "template_id", "properties"],
+  "properties": {
+    "meeting_id": {
+      "type": "string",
+      "description": "Aircover meeting identifier — matches a row in meetings.json."
+    },
+    "deal_id": {
+      "type": "string",
+      "description": "Mirrored from meetings.json. May be empty."
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Mirrored from meetings.json. May be empty for legacy meetings."
+    },
+    "template_id": {
+      "type": "string",
+      "description": "Coaching template id this output was generated against."
+    },
+    "properties": {
+      "type": "object",
+      "description": "Keyed by property id (a stable identifier defined in the template). Each value is the agent's structured result for that property.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "result", "score", "max_score"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Human-readable label for the property (e.g., 'Pain Points')."
+          },
+          "result": {
+            "type": "string",
+            "description": "The agent's textual response for this property. 'N/A' if the agent had no response."
+          },
+          "score": {
+            "type": ["number", "string"],
+            "description": "Numeric score the agent assigned. Returned as a string in some legacy responses; treat as numeric when possible."
+          },
+          "max_score": {
+            "type": ["number", "string"],
+            "description": "Maximum possible score for this property as defined in the template. Use to compute percentages."
+          }
+        }
+      }
+    }
+  }
+}

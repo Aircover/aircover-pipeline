@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aircover.ai/schemas/aircover-pipeline/summary-1.0.json",
+  "title": "Aircover Pipeline — summary.json (v1.0)",
+  "description": "Run summary written to <output-dir>/summary.json at the end of each pipeline invocation.",
+  "type": "object",
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "Version of the output schema family. Bumped on breaking changes."
+    },
+    "package_version": {
+      "type": "string",
+      "description": "Version of the aircover-pipeline package that produced this output (e.g., '1.0.1'). Helpful for audit trails when reproducing or troubleshooting a run."
+    },
+    "ran_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of when the run completed."
+    },
+    "base_url": {
+      "type": "string",
+      "description": "API base URL used for this run (e.g., production vs staging)."
+    },
+    "filters": {
+      "type": "object",
+      "description": "The exact filter arguments applied to this run. Useful when reproducing a result or diffing across runs.",
+      "properties": {
+        "exclude_domains": { "type": ["string", "null"] },
+        "filter_emails": { "type": ["string", "null"] },
+        "filter_teams": { "type": ["string", "null"] },
+        "limit": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "dry_run": {
+      "type": "boolean",
+      "description": "true when invoked with --dry-run. The success/failed/processed_this_run fields will be absent in dry-run summaries."
+    },
+    "start": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Start date passed via --start (YYYY-MM-DD)."
+    },
+    "end": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "End date passed via --end (YYYY-MM-DD)."
+    },
+    "template_id": {
+      "type": "string",
+      "description": "Coaching template id this run was executed against."
+    },
+    "meetings_in_window": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total candidate meetings for the date range after --exclude-domains / --filter-emails / --filter-teams are applied. Captured BEFORE --resume and --limit pruning, so this is the size of the filtered population, not the number actually processed in this run."
+    },
+    "processed_this_run": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Meetings the script attempted to process in this invocation (excludes rows skipped via --resume). Absent in --dry-run summaries."
+    },
+    "success": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Meetings with a successful agent output written. Absent in --dry-run summaries."
+    },
+    "failed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Meetings whose coaching call failed. See failures.json for details. Absent in --dry-run summaries."
+    },
+    "skipped_resume": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Meetings skipped because an agent-output file already existed (set when --resume is used). Absent in --dry-run summaries."
+    }
+  }
+}
