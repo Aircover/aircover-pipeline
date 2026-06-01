@@ -2,6 +2,30 @@
 
 A Python script that pulls a list of meetings from the Aircover API for a date range and runs a coaching agent template against each one.
 
+## Install
+
+```sh
+pip install aircover-pipeline
+```
+
+Then either run the CLI directly:
+
+```sh
+aircover-pipeline --list-templates
+aircover-pipeline --start 2026-01-01 --end 2026-03-31 \
+                  --template-id <id> --output-dir ./out
+```
+
+Or import the client in your own code:
+
+```python
+from aircover_client import AircoverClient
+client = AircoverClient(username="...", password="...")
+meetings = client.get_meetings(start="2026-01-01", end="2026-03-31")
+```
+
+See [Authentication](#authentication) for credential setup (`.env` is recommended).
+
 ## What this does
 
 1. Authenticates to the Aircover API.
