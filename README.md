@@ -105,22 +105,84 @@ The script will read `.env` automatically.
 
 ### Option B — Bearer token (SSO-only accounts)
 
-If your Aircover account logs in via SSO (Google, Okta, etc.), `/auth/login` will reject your password. Paste a bearer token from the web app instead:
+If your Aircover account logs in via SSO (Google, Okta, etc.), `/auth/login` will reject your password. You need to grab a bearer token from the web app's localStorage instead. Three ways, in order of ease:
 
-1. Open `https://app.aircover.ai` and sign in via SSO.
-2. Open browser dev tools (F12 or Cmd+Opt+I).
-3. Go to **Application → Local Storage → `https://app.aircover.ai`**.
-4. Find the entry containing `authInfo` (or `access_token` / `refresh_token` directly). It's a JSON blob; copy the values of `access_token` and `refresh_token`.
-5. Put them in `.env`:
+#### Method 1 — Bookmarklet (recommended)
+
+One-time setup, then one click per terminal session.
+
+1. In Chrome, press **Cmd+Shift+B** (Mac) or **Ctrl+Shift+B** (Windows/Linux) to show the bookmarks bar.
+2. Right-click the bookmarks bar → **Add page**.
+3. **Name:** `Aircover token`. **URL:** paste this entire line (one continuous URL — wrapping in this file is for display only):
 
    ```
-   AIRCOVER_ACCESS_TOKEN=eyJhbGciOi...
-   AIRCOVER_REFRESH_TOKEN=eyJhbGciOi...
+   javascript:(()=>{const raw=localStorage.getItem('GetStorage');if(!raw)return alert('GetStorage not found. Are you signed in to app.aircover.ai?');try{const o=JSON.parse(raw);const a=typeof o.authInfo==='string'?JSON.parse(o.authInfo):o.authInfo;if(a?.access_token&&a?.refresh_token){const t='export AIRCOVER_ACCESS_TOKEN='+JSON.stringify(a.access_token)+'\nexport AIRCOVER_REFRESH_TOKEN='+JSON.stringify(a.refresh_token);navigator.clipboard.writeText(t).then(()=>alert('Tokens copied to clipboard.'));}else alert('No tokens in authInfo.');}catch(e){alert('Parse failed: '+e.message);}})();
    ```
 
-   Or pass them on the command line via `--access-token` / `--refresh-token`.
+4. Click **Save**.
+
+**To use:** sign into <https://app.aircover.ai>, then click the **Aircover token** bookmark on the bookmarks bar. An alert confirms "Tokens copied to clipboard." Paste into your terminal — two `export` lines drop in. Hit Enter to set them in the current shell.
+
+> Note: pasting the `javascript:` URL directly into Chrome's address bar does **not** work — Chrome strips the `javascript:` prefix for security. The bookmark route bypasses this.
+
+#### Method 2 — Browser console snippet (no bookmark setup)
+
+1. Sign into <https://app.aircover.ai>.
+2. Open DevTools (F12 or Cmd+Opt+I), click the **Console** tab.
+3. Paste this and press Enter:
+
+   ```js
+   (() => {
+     const raw = localStorage.getItem('GetStorage');
+     if (!raw) return console.warn('GetStorage not found.');
+     try {
+       const outer = JSON.parse(raw);
+       const auth = typeof outer.authInfo === 'string' ? JSON.parse(outer.authInfo) : outer.authInfo;
+       if (auth?.access_token && auth?.refresh_token) {
+         console.log('export AIRCOVER_ACCESS_TOKEN=' + JSON.stringify(auth.access_token));
+         console.log('export AIRCOVER_REFRESH_TOKEN=' + JSON.stringify(auth.refresh_token));
+       } else {
+         console.warn('authInfo found but missing tokens.');
+       }
+     } catch (e) {
+       console.error('Parse failed:', e);
+     }
+   })();
+   ```
+
+4. Two `export ...` lines print in the console. Select them with your mouse, **Cmd+C** to copy, paste in terminal.
+
+> The console version doesn't auto-copy to clipboard (Chrome's clipboard API blocks writes when DevTools is the focused panel rather than the page). The bookmarklet version doesn't hit this restriction.
+
+#### Method 3 — Manual extraction (deep fallback)
+
+If both scripts fail (e.g., a browser other than Chrome with a different storage layout):
+
+1. In DevTools, go to **Application → Local Storage → `https://app.aircover.ai`**.
+2. Click the `GetStorage` row. The value is a JSON string with an `authInfo` field nested inside.
+3. Paste the value into a JSON formatter (e.g., jsonformatter.org) and locate `authInfo.access_token` and `authInfo.refresh_token`.
+4. Set them in your shell.
+
+#### Once you have the tokens
+
+Either export them in your shell:
+
+```sh
+export AIRCOVER_ACCESS_TOKEN='eyJhbGciOi...'
+export AIRCOVER_REFRESH_TOKEN='eyJhbGciOi...'
+```
+
+Or put them in `.env` (gitignored) for persistence across terminal sessions:
+
+```
+AIRCOVER_ACCESS_TOKEN=eyJhbGciOi...
+AIRCOVER_REFRESH_TOKEN=eyJhbGciOi...
+```
+
+Or pass them on the command line via `--access-token` / `--refresh-token` (not recommended — leaks to shell history).
 
 The refresh token typically lives ~60 days. The access token lives ~1 hour and is auto-refreshed by the script as long as the refresh token is set.
+
 
 ### Security
 
