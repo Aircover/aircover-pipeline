@@ -151,6 +151,23 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "at a staging environment."
         ),
     )
+    auth.add_argument(
+        "--api-token",
+        help=(
+            "Static API key (e.g. ac_...). Requires --customer-org. "
+            "No login or token refresh needed. "
+            "Prefer AIRCOVER_API_TOKEN in .env over the CLI flag."
+        ),
+    )
+    auth.add_argument(
+        "--customer-org",
+        help=(
+            "Customer org domain (e.g. postman.com). Sent as the "
+            "X-Aircover-Org header on every API request. Required "
+            "when using --api-token. "
+            "Set AIRCOVER_CUSTOMER_ORG in .env for the same effect."
+        ),
+    )
 
     p.add_argument(
         "--list-templates",
@@ -339,6 +356,8 @@ def main(argv: list[str] | None = None) -> int:
             access_token=args.access_token,
             refresh_token=args.refresh_token,
             base_url=args.base_url,
+            customer_org=args.customer_org,
+            api_token=args.api_token,
         )
         client.login()  # no-op if bearer-token auth
     except (ValueError, RuntimeError) as e:

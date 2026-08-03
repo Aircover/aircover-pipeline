@@ -1,11 +1,14 @@
 """
 Aircover API client.
 
-Two auth modes:
+Three auth modes:
 
 1. Username + password — call .login() after constructing.
 2. Bearer token — pass access_token (and optionally refresh_token) to the
    constructor; no .login() call needed.
+3. API token — pass api_token and customer_org; no .login() call needed,
+   no refresh. The token is sent as ``Authorization: Bearer <api_token>``
+   with a required ``X-Aircover-Org`` header.
 
 Credentials are loaded from .env or environment variables if not passed
 explicitly. See .env.example.
@@ -110,6 +113,8 @@ class AircoverClient:
         timeout: float = 30.0,
         base_url: Optional[str] = None,
         max_retries: int = 3,
+        customer_org: Optional[str] = None,
+        api_token: Optional[str] = None,
     ):
         """
         Args:
@@ -117,6 +122,8 @@ class AircoverClient:
                 after constructing to authenticate.
             access_token, refresh_token: For bearer-token auth. Skip .login();
                 tokens are usable immediately.
+            api_token: Static API key (e.g. "ac_..."). Requires customer_org.
+                No login or refresh needed.
             env_path: Path to a .env file to load credentials from. Defaults
                 to ./.env relative to the current working directory.
             timeout: HTTP timeout in seconds for all API calls.
@@ -124,7 +131,13 @@ class AircoverClient:
                 env var, or https://api.aircover.ai. Use this to point at a
                 staging environment.
             max_retries: Max retry attempts on transient errors (429, 5xx).
+            customer_org: Customer org domain (e.g. "postman.com"). Sent as
+                the X-Aircover-Org header on every request. Required when
+                using api_token auth. Falls back to AIRCOVER_CUSTOMER_ORG
+                env var / .env.
         """
+        self._customer_org = customer_org
+        self._api_token = api_token
         self._creds = Credentials(
             username=username,
             password=password,
@@ -141,17 +154,25 @@ class AircoverClient:
         self._max_retries = max_retries
 
         # Fall back to env / .env if nothing was passed directly
-        if not (self._creds.has_bearer or self._creds.can_login):
+        if not (self._api_token or self._creds.has_bearer or self._creds.can_login):
             self._load_env_vars()
-            if not (self._creds.has_bearer or self._creds.can_login):
+            if not (self._api_token or self._creds.has_bearer or self._creds.can_login):
                 self._load_dotenv(env_path or Path.cwd() / ".env")
 
-        if not (self._creds.has_bearer or self._creds.can_login):
+        if self._api_token:
+            if not self._customer_org:
+                raise ValueError(
+                    "--customer-org (or AIRCOVER_CUSTOMER_ORG) is required "
+                    "when using API-token auth."
+                )
+        elif not (self._creds.has_bearer or self._creds.can_login):
             raise ValueError(
                 "No Aircover credentials found. Provide one of:\n"
                 "  AIRCOVER_USERNAME + AIRCOVER_PASSWORD, or\n"
                 "  AIRCOVER_ACCESS_TOKEN (+ AIRCOVER_REFRESH_TOKEN) for "
-                "SSO-only accounts.\n"
+                "SSO-only accounts, or\n"
+                "  AIRCOVER_API_TOKEN + AIRCOVER_CUSTOMER_ORG for "
+                "API-token auth.\n"
                 "Set these as environment variables or in a .env file."
             )
 
@@ -169,12 +190,16 @@ class AircoverClient:
             self._creds.access_token = os.environ.get("AIRCOVER_ACCESS_TOKEN")
         if not self._creds.refresh_token:
             self._creds.refresh_token = os.environ.get("AIRCOVER_REFRESH_TOKEN")
+        if not self._api_token:
+            self._api_token = os.environ.get("AIRCOVER_API_TOKEN")
+        if not self._customer_org:
+            self._customer_org = os.environ.get("AIRCOVER_CUSTOMER_ORG")
 
     def _load_dotenv(self, path: Path) -> None:
         """Minimal .env parser — no python-dotenv dependency."""
         if not path.exists():
             return
-        keys = {
+        cred_keys = {
             "AIRCOVER_USERNAME": "username",
             "AIRCOVER_PASSWORD": "password",
             "AIRCOVER_ACCESS_TOKEN": "access_token",
@@ -188,14 +213,21 @@ class AircoverClient:
                 key, value = line.split("=", 1)
                 key = key.strip()
                 value = value.strip().strip("'\"")
-                attr = keys.get(key)
+                attr = cred_keys.get(key)
                 if attr and not getattr(self._creds, attr):
                     setattr(self._creds, attr, value)
+                if key == "AIRCOVER_API_TOKEN" and not self._api_token:
+                    self._api_token = value
+                if key == "AIRCOVER_CUSTOMER_ORG" and not self._customer_org:
+                    self._customer_org = value
 
     # ── Auth ──────────────────────────────────────────────────────────────
 
     def login(self) -> None:
-        """Authenticate via /auth/login. No-op if bearer tokens are set."""
+        """Authenticate via /auth/login. No-op if bearer/API tokens are set."""
+        if self._api_token:
+            log.debug("API-token mode — skipping login()")
+            return
         if self._creds.has_bearer and not self._creds.can_login:
             log.debug("Bearer-token mode — skipping login()")
             return
@@ -291,12 +323,16 @@ class AircoverClient:
     # ── Request plumbing ──────────────────────────────────────────────────
 
     def _auth_headers(self) -> dict:
-        if not self._creds.access_token:
+        token = self._api_token or self._creds.access_token
+        if not token:
             raise RuntimeError(
-                "No access token. Call .login() or pass access_token "
-                "to the constructor."
+                "No access token. Call .login() or pass access_token / "
+                "api_token to the constructor."
             )
-        return {"Authorization": f"Bearer {self._creds.access_token}"}
+        headers = {"Authorization": f"Bearer {token}"}
+        if self._customer_org:
+            headers["X-Aircover-Org"] = self._customer_org
+        return headers
 
     def _request(self, method: str, url: str, **kwargs) -> requests.Response:
         """Authenticated request with proactive refresh, 401 retry, and
@@ -305,7 +341,7 @@ class AircoverClient:
         Respects the Retry-After header on 429 when present.
         """
         self._request_count += 1
-        if self._request_count % self.PROACTIVE_REFRESH_EVERY == 0:
+        if not self._api_token and self._request_count % self.PROACTIVE_REFRESH_EVERY == 0:
             self._refresh()
 
         attempt = 0
@@ -331,7 +367,8 @@ class AircoverClient:
                 continue
 
             # 401: refresh + retry once with new token, no backoff.
-            if response.status_code == 401 and self._refresh():
+            # Skip for API-token auth — the token is static.
+            if not self._api_token and response.status_code == 401 and self._refresh():
                 response = requests.request(
                     method,
                     url,
